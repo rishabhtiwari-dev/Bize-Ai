@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BiztelAI | Shop-Floor Supervisor Copilot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top App Bar -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="brand-badge">
+                    <span class="pulse-dot"></span>
+                    <span class="brand-name">BIZTEL<span class="highlight">AI</span></span>
+                </div>
+                <div class="header-titles">
+                    <h1 class="header-title">Plant Copilot</h1>
+                    <span class="plant-tag">Hosur Plant • Kaveri Precision Components</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="qr-btn" class="icon-btn" title="Open on Mobile / Show QR Code" aria-label="Show QR Code">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span class="btn-text">Phone Access</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Active SOP Scope Indicator Bar -->
+        <div class="sop-scope-bar">
+            <div class="scope-scroll">
+                <span class="scope-label">ACTIVE SOPs:</span>
+                <span class="scope-pill"><span class="badge active">Rev 02</span> MNT-MAN-CNC-02</span>
+                <span class="scope-pill"><span class="badge active">Rev 04</span> QC-SOP-014</span>
+                <span class="scope-pill"><span class="badge active">Rev 05</span> SAF-SOP-003</span>
+                <span class="scope-pill superseded"><span class="badge old">Rev 03</span> QC-SOP-014 (Superseded)</span>
+            </div>
+        </div>
+
+        <!-- Main Query Section -->
+        <main class="main-content">
+            <!-- Search / Query Form -->
+            <section class="query-section">
+                <form id="query-form" class="query-form">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="query-input" 
+                            rows="2" 
+                            placeholder="Ask about alarms (e.g. AL-104), tolerances, LOTO, maintenance schedules..."
+                            required
+                        ></textarea>
+                        
+                        <div class="input-actions">
+                            <button type="button" id="voice-btn" class="voice-btn" title="Voice Input (Speech-to-Text)" aria-label="Voice Input">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                                </svg>
+                                <span class="voice-status" id="voice-status">Speak</span>
+                            </button>
+                            
+                            <button type="submit" id="submit-btn" class="submit-btn" aria-label="Ask Copilot">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                                <span>Ask</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Quick Action Chips -->
+                <div class="quick-chips-section">
+                    <div class="chips-title">QUICK SHOP-FLOOR LOOKUP:</div>
+                    <div class="chips-container">
+                        <button class="chip" data-q="What is the recommended coolant concentration for the TX-200 CNC turning centre?">
+                            💧 Coolant Concentration
+                        </button>
+                        <button class="chip" data-q="The machine is showing alarm AL-104. What does it mean and what should the operator do?">
+                            ⚠️ Alarm AL-104 (Lube)
+                        </button>
+                        <button class="chip" data-q="Who is allowed to remove a lockout lock from a machine?">
+                            🔒 LOTO Lock Removal
+                        </button>
+                        <button class="chip" data-q="What is the outer diameter tolerance for the BH-220 bearing housing?">
+                            📐 BH-220 OD Tolerance
+                        </button>
+                        <button class="chip" data-q="How often should spindle runout be checked, and who does it?">
+                            ⚙️ Spindle Runout Check
+                        </button>
+                        <button class="chip warning-chip" data-q="What is the maximum feed rate and spindle speed for cutting titanium alloy on CNC-04?">
+                            ❓ Titanium Machining (Unanswerable)
+                        </button>
+                        <button class="chip" data-q="What should the inspector do if the supplier's Material Test Certificate (MTC) is missing?">
+                            📋 Missing MTC Action
+                        </button>
+                        <button class="chip" data-q="What is the torque for TX-200 chuck mounting bolts after maintenance?">
+                            🔧 Chuck Bolt Torque
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="result-section" class="result-section hidden">
+                <!-- Answer Card -->
+                <div class="answer-card" id="answer-card">
+                    <div class="answer-header">
+                        <div class="status-indicator">
+                            <span id="found-badge" class="badge-found">VERIFIED SOURCE</span>
+                            <span id="provider-badge" class="badge-provider">Engine</span>
+                        </div>
+                        <div class="header-tools">
+                            <button id="copy-btn" class="tool-btn" title="Copy answer to clipboard">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                <span>Copy</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Superseded Warning Alert Banner -->
+                    <div id="superseded-alert" class="alert-banner warning-banner hidden">
+                        <div class="alert-icon">⚠️</div>
+                        <div class="alert-content">
+                            <strong>REVISION WARNING</strong>
+                            <p id="superseded-text"></p>
+                        </div>
+                    </div>
+
+                    <!-- Not Found / Fallback Alert Banner -->
+                    <div id="not-found-alert" class="alert-banner info-banner hidden">
+                        <div class="alert-icon">ℹ️</div>
+                        <div class="alert-content">
+                            <strong>OUT OF DOCUMENT SCOPE</strong>
+                            <p>This query cannot be answered from the 4 plant SOP documents. Zero hallucinations policy active.</p>
+                        </div>
+                    </div>
+
+                    <!-- Answer Body -->
+                    <div class="answer-body" id="answer-body"></div>
+
+                    <!-- Processing Metric -->
+                    <div class="answer-footer">
+                        <span id="time-badge" class="footer-meta">⏱ 0 ms</span>
+                        <span id="doc-badge" class="footer-meta">📚 0 sources cited</span>
+                    </div>
+                </div>
+
+                <!-- Sources & Citations Drawer -->
+                <div class="sources-container" id="sources-container">
+                    <h3 class="sources-title">
+                        <span>Official SOP Sources & Citations</span>
+                        <span class="source-hint">Inspect exact document, revision, and page</span>
+                    </h3>
+                    <div id="sources-list" class="sources-list"></div>
+                </div>
+            </section>
+
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="loading-state hidden">
+                <div class="spinner"></div>
+                <p>Searching shop-floor SOPs and verifying revision...</p>
+            </div>
+        </main>
+
+        <!-- QR Code / Mobile Access Modal -->
+        <div id="qr-modal" class="modal hidden">
+            <div class="modal-backdrop"></div>
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Open on Phone or Tablet</h3>
+                    <button id="close-modal-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-subtext">Scan this QR code with your phone camera (must be on the same plant Wi-Fi network):</p>
+                    <div class="qr-wrapper">
+                        <img id="qr-img" src="/api/qr" alt="QR Code to open Copilot on phone">
+                    </div>
+                    <div class="lan-url-box">
+                        <span class="url-label">Direct Mobile URL:</span>
+                        <code id="lan-url-display">http://<span id="ip-val"></span>:8000</code>
+                        <button id="copy-url-btn" class="mini-btn">Copy URL</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
