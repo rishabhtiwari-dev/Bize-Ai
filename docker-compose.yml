@@ -1,0 +1,14 @@
+services:
+  copilot:
+    build: .
+    container_name: biztelai-plant-copilot
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      # - GROQ_API_KEY=${GROQ_API_KEY}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    volumes:
+      - ./docs:/app/docs:ro
