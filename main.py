@@ -76,6 +76,11 @@ app = FastAPI(
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(config.STATIC_DIR)), name="static")
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    favicon_path = config.STATIC_DIR / "favicon.svg"
+    return FileResponse(favicon_path, media_type="image/svg+xml")
+
 @app.get("/", response_class=FileResponse)
 async def serve_index():
     index_file = config.TEMPLATES_DIR / "index.html"
