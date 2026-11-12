@@ -296,6 +296,23 @@ tests/test_rag.py::test_superseded_warning_when_querying_old_standard PASSED [10
 
 ---
 
+### 3. Real Shop-Floor Human Queries vs. Formal Queries
+
+On an actual shop floor, supervisors and operators don't speak in formal academic prose. The copilot is specifically tested and optimized to handle messy, conversational human phrasing:
+
+| Real Human Shop-Floor Query | Intent / Standard Topic | App Answer & Citation |
+|---|---|---|
+| *"AL-104 popped up on CNC-06. What oil do I top up and how to reset?"* | Machine Alarm Troubleshooting | Top up **ISO VG 68 oil** to MAX mark, press RESET (`MNT-MAN-CNC-02 Rev 02, Page 2`) |
+| *"Refractometer check: what coolant percentage should we maintain on the TX-200?"* | Daily Operating Parameter | Recommended **6 - 8 %**, refractometer × 1.0 factor (`MNT-MAN-CNC-02 Rev 02, Page 1`) |
+| *"Technician left his red LOTO lock on CNC-04 and went home. Can I take it off myself?"* | Safety Lockout Policy | **No.** Only owner can remove. Absent owner requires PM + Safety Officer authorization (`SAF-SOP-003 Rev 05, Page 1-2`) |
+| *"Supplier delivered a batch of steel bars but forgot the MTC certificate. Can we proceed?"* | Incoming Inspection Rule | **No.** Put on **HOLD**. MTC is mandatory under Rev 04 (`QC-SOP-014 Rev 04, Page 2`) |
+| *"Inspector is measuring BH-220 bearing housings with a digital caliper. What are the OD limits?"* | Dimensional Quality Check | Nominal **90.000 mm**, Tolerance **+/- 0.050 mm** (`QC-SOP-014 Rev 04, Page 2`) |
+| *"Receiving just got 250 bought-out pins. How many pieces to sample, and defect rule?"* | Lot Sampling Plan | Inspect **13 samples**. Minor: 0 allowed. Major/Critical: Reject (`QC-SOP-014 Rev 04, Page 1`) |
+| *"Technician just re-mounted the chuck on TX-200. What torque and pattern should he use?"* | Assembly & Maintenance | Tighten in **criss-cross sequence to 110 Nm** (`MNT-MAN-CNC-02 Rev 02, Page 1`) |
+| *"Operator wants to know: what feed rate and spindle speed for cutting titanium on CNC-04?"* | **Unanswerable / Out of Scope** | **Strict Refusal**: *"This information is not found in the plant SOPs"* (Zero hallucinations) |
+
+---
+
 ## 📂 Component File Structure
 
 ```

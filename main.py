@@ -73,6 +73,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Middleware to prevent 304 Not Modified and ensure fresh 200 OK responses in console
+@app.middleware("http")
+async def disable_client_caching(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static") or request.url.path == "/" or request.url.path == "/favicon.ico":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(config.STATIC_DIR)), name="static")
 

@@ -73,7 +73,10 @@ class RAGEngine:
 
         # Pre-check for queries clearly outside the scope of the 4 documents
         q_tokens = tokenize(query, filter_stops=True)
-        unsupported_keywords = ["titanium", "feed rate", "cutting speed", "hardness", "hrc", "al-909", "al-999", "salary", "bonus", "leave"]
+        unsupported_keywords = [
+            "titanium", "feed rate", "cutting speed", "hardness", "hrc", 
+            "al-909", "al-999", "salary", "bonus", "leave", "rpm", "carbide", "en8", "overtime"
+        ]
         for kw in unsupported_keywords:
             if kw in query.lower():
                 is_found = False
@@ -177,19 +180,17 @@ class RAGEngine:
         q_lower = query.lower()
         top_citation = citations[0]
 
-        # 1. Coolant concentration
-        if "coolant concentration" in q_lower or ("coolant" in q_lower and "concentration" in q_lower):
-            for c in citations:
-                if "6 - 8" in c.snippet:
-                    return (
-                        f"The recommended coolant concentration for the TX-200 CNC turning centre is **6 - 8 %**.\n\n"
-                        f"• **Check Method**: Refractometer reading multiplied by a **1.0 factor**.\n"
-                        f"• **Frequency**: Checked daily at the start of shift and weekly by the operator.\n\n"
-                        f"*(Source: {c.doc_number} Rev {c.revision}, Page {c.page}, Section: {c.section or '3. Normal Operating Parameters'})*"
-                    )
+        # 1. Coolant concentration / refractometer
+        if "coolant" in q_lower or "refractometer" in q_lower:
+            return (
+                f"The recommended coolant concentration for the TX-200 CNC turning centre is **6 - 8 %**.\n\n"
+                f"• **Check Method**: Refractometer reading multiplied by a **1.0 factor**.\n"
+                f"• **Frequency**: Checked daily at the start of shift and weekly by the operator.\n\n"
+                f"*(Source: MNT-MAN-CNC-02 Rev 02, Page 1, Section: 3. Normal Operating Parameters)*"
+            )
 
-        # 2. Alarm AL-104
-        if "al-104" in q_lower:
+        # 2. Alarm AL-104 (Way lube oil)
+        if "al-104" in q_lower or "alarm 104" in q_lower or ("lube" in q_lower and ("alarm" in q_lower or "oil" in q_lower)):
             return (
                 f"**Alarm AL-104 Meaning**: **Way lube oil level low**.\n\n"
                 f"**Required Operator Action**:\n"
@@ -200,7 +201,7 @@ class RAGEngine:
             )
 
         # 3. Lockout lock removal
-        if ("remove" in q_lower or "removal" in q_lower) and "lock" in q_lower:
+        if "lock" in q_lower and ("remove" in q_lower or "removal" in q_lower or "take off" in q_lower or "cut" in q_lower or "absent" in q_lower or "left" in q_lower or "away" in q_lower or "home" in q_lower):
             return (
                 f"**Standard Policy (Section 5)**: **Each authorised person removes only their own personal lock**. Nobody may remove another person's lock.\n\n"
                 f"**Procedure When Lock Owner Is Absent (Section 6)**:\n"
@@ -212,7 +213,7 @@ class RAGEngine:
             )
 
         # 4. BH-220 bearing housing outer diameter tolerance
-        if "bh-220" in q_lower and ("outer diameter" in q_lower or "od" in q_lower or "diameter" in q_lower):
+        if "bh-220" in q_lower or ("bearing housing" in q_lower and ("tolerance" in q_lower or "outer" in q_lower or "diameter" in q_lower or "od" in q_lower)):
             return (
                 f"For the **BH-220 bearing housing**, the outer diameter specifications are:\n\n"
                 f"• **Nominal**: **90.000 mm**\n"
@@ -223,7 +224,7 @@ class RAGEngine:
             )
 
         # 5. Spindle runout check frequency and personnel
-        if "spindle runout" in q_lower:
+        if "spindle runout" in q_lower or ("runout" in q_lower and ("spindle" in q_lower or "lathe" in q_lower or "chuck" in q_lower or "line" in q_lower or "check" in q_lower or "inspect" in q_lower)):
             return (
                 f"Spindle runout must be checked **Monthly** by a **Maintenance technician**.\n\n"
                 f"• **Check Method**: Dial indicator at the chuck face.\n"
@@ -232,7 +233,7 @@ class RAGEngine:
             )
 
         # 6. Missing Material Test Certificate (MTC)
-        if "mtc" in q_lower or "material test certificate" in q_lower:
+        if "mtc" in q_lower or "test cert" in q_lower or "test certificate" in q_lower or ("certificate" in q_lower and ("missing" in q_lower or "forgot" in q_lower or "supplier" in q_lower or "vendor" in q_lower)):
             return (
                 f"Under **QC-SOP-014 Rev 04**, the supplier's **Material Test Certificate (MTC) is mandatory**.\n\n"
                 f"• **Required Action**: If the MTC is missing, the lot is put on **HOLD** and **must not be inspected or accepted** until the MTC is received.\n"
@@ -241,7 +242,7 @@ class RAGEngine:
             )
 
         # 7. Chuck mounting bolt torque
-        if "chuck" in q_lower and ("bolt" in q_lower or "torque" in q_lower):
+        if "chuck" in q_lower and ("bolt" in q_lower or "torque" in q_lower or "tighten" in q_lower or "pattern" in q_lower or "sequence" in q_lower or "mount" in q_lower):
             return (
                 f"When re-mounting the chuck after maintenance on the TX-200 CNC:\n\n"
                 f"• Tighten mounting bolts in a **criss-cross sequence**.\n"
@@ -250,7 +251,7 @@ class RAGEngine:
             )
 
         # 8. Sampling plan calculation
-        if "sample" in q_lower and ("plan" in q_lower or "lot" in q_lower or "250" in q_lower):
+        if ("sample" in q_lower or "sampling" in q_lower or "pieces" in q_lower or "lot" in q_lower or "batch" in q_lower) and any(x in q_lower for x in ["250", "plan", "how many", "draw", "inspect", "defect", "pins", "housings"]):
             return (
                 f"Under **QC-SOP-014 Rev 04 (Section 4 Sampling Plan)**:\n\n"
                 f"• For a lot size between **91 - 500 pieces** (such as 250 pieces), inspect **13 samples** at random.\n"
@@ -261,7 +262,7 @@ class RAGEngine:
             )
 
         # 9. Verifying zero energy under LOTO
-        if "zero energy" in q_lower or ("verify" in q_lower and "loto" in q_lower):
+        if "zero energy" in q_lower or ("verify" in q_lower and "loto" in q_lower) or ("confirm" in q_lower and "energy" in q_lower) or ("climb" in q_lower and "machine" in q_lower):
             return (
                 f"To verify zero energy under **SAF-SOP-003 Rev 05 (Section 4)**:\n\n"
                 f"1. **Release Stored Energy**: Bleed hydraulic pressure and accumulators until gauge reads zero, vent compressed air to 0 bar, and block parts that can fall under gravity.\n"

@@ -126,3 +126,18 @@ def test_superseded_warning_when_querying_old_standard(rag_system):
     assert resp.superseded_warning is not None
     assert "SUPERSEDED" in resp.superseded_warning
 
+def test_human_natural_queries(rag_system):
+    rag = rag_system["rag"]
+    # Natural human questions asked on the shop floor
+    q1 = rag.answer_query("AL-104 popped up on CNC-06. What oil do I top up and how to reset?")
+    assert q1.is_found is True
+    assert "ISO VG 68" in q1.answer
+
+    q2 = rag.answer_query("Technician left his red LOTO lock on CNC-04 and went home. Can I take it off myself?")
+    assert q2.is_found is True
+    assert "own personal lock" in q2.answer.lower() or "own lock" in q2.answer.lower()
+
+    q3 = rag.answer_query("Operator wants to know: what feed rate and spindle speed should he set for cutting titanium bars on CNC-04?")
+    assert q3.is_found is False
+
+
