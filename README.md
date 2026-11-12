@@ -1,367 +1,253 @@
-# 🏭 BiztelAI — Shop-Floor Supervisor AI Copilot
+# BiztelAI — Shop-Floor Supervisor Copilot
 
-[![Tests](https://img.shields.io/badge/pytest-12%20passed-brightgreen.svg)](tests/test_rag.py)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com)
-[![Mobile Ready](https://img.shields.io/badge/UI-Mobile%20Optimized-orange.svg)](#-local-network--mobile-deployment)
+A simple, fast, and grounded assistant built for manufacturing shop-floor supervisors at **Kaveri Precision Components Pvt. Ltd. (Hosur Plant)**. 
 
-> An intelligent, grounded, and revision-aware AI assistant built for manufacturing shop-floor supervisors at **Kaveri Precision Components Pvt. Ltd. (Hosur Plant)**. Provides instant, verified answers from plant SOPs, manuals, and safety procedures directly to smartphones and tablets on the shop floor.
+Supervisors on a noisy shift don't have time to walk back to an office and dig through three-ring binders. This tool lets them pull out their phone or tablet, ask a question about an alarm, inspection rule, or safety lockout, and get a direct, verified answer in 2 seconds with the exact document, revision, and page number cited.
 
 ---
 
-## 📑 Table of Contents
-1. [Overview & Key Features](#-overview--key-features)
-2. [Project Architecture](#-project-architecture)
-3. [Setup & Quick Start](#-setup--quick-start)
-4. [Local Network & Mobile Deployment](#-local-network--mobile-deployment)
-5. [Testing & Evaluation](#-testing--evaluation)
-   - [Sample Questions & App Answers](#1-sample-questions-answers)
-   - [Our 5 Custom Questions & App Answers](#2-our-5-custom-questions-answers)
-6. [Component File Structure](#-component-file-structure)
-7. [Submission Deliverables](#-submission-deliverables)
+## What's in Here
+
+- **FastAPI backend** with a clean, mobile-first web interface.
+- **RAG pipeline over the 4 provided PDFs**:
+  - `MNT-MAN-CNC-02 Rev 02` — TX-200 CNC Preventive Maintenance Manual
+  - `QC-SOP-014 Rev 03` — Incoming Material Inspection (Superseded)
+  - `QC-SOP-014 Rev 04` — Incoming Material Inspection (Current Active Standard)
+  - `SAF-SOP-003 Rev 05` — Lockout / Tagout (LOTO) Safety Procedure
+- **Zero hallucinations**: If an answer isn't in the plant documents, the app says so straight up.
+- **Revision-Aware Guardrail (My added improvement)**: The plant has both Rev 03 and Rev 04 of the QC SOP in circulation. In manufacturing, following an obsolete SOP causes major audit non-conformances and scrap parts. The app automatically detects superseded documents, defaults to the active standard, and flags an alert if an older rule is queried.
+- **Works 100% offline out-of-the-box**: Comes with a built-in deterministic extractor and BM25 ranker, so you don't even need an external API key to run and test it. If you want full LLM generation, drop in a Groq or OpenAI key in `.env`.
+- **Phone access on the same Wi-Fi**: Binds to `0.0.0.0` and prints an ASCII QR code in the terminal so you can scan and open it immediately on your phone.
 
 ---
 
-## 🚀 Overview & Key Features
+## Quick Setup (Run in 60 Seconds)
 
-* **Zero-Hallucination Grounded QA**: Strictly answers from the indexed plant documentation (`MNT-MAN-CNC-02`, `QC-SOP-014`, `SAF-SOP-003`). If an answer is not in the documents, the copilot explicitly says so.
-* **Revision-Aware Intelligence (The Core Improvement)**: Automatically detects when a procedure is superseded (e.g., `QC-SOP-014 Rev 03` is superseded by `Rev 04`), prioritizes the active standard, and alerts supervisors with warning banners if outdated procedures are searched.
-* **Mobile-First Shop-Floor UX**: Designed for noisy, high-glare plant environments with high-contrast UI, thumb-friendly tap targets, one-tap quick lookup chips, and voice input (Speech-to-Text).
-* **Multi-Provider LLM Chain**:
-  * **Groq**: Ultra-fast inference with `llama-3.3-70b-versatile` or `llama-3.1-8b-instant`.
-  * **OpenAI / Ollama**: Plug-and-play local or cloud OpenAI-compatible endpoints.
-  * **Smart Local Extractor (Offline Fallback)**: Runs 100% out of the box without any external API keys or cloud dependencies.
-* **Instant Phone Access via QR Code**: Auto-detects your LAN IP and prints an ASCII QR code in your terminal upon launch, plus a web modal with a camera-scannable QR code.
+### 1. Install dependencies
+Make sure you have Python 3.10+ installed.
 
----
-
-## 🏛 Project Architecture
-
-```
-                  ┌──────────────────────────────────────────────┐
-                  │    Plant Floor Supervisor (Phone / Tablet)    │
-                  └───────────────────────┬──────────────────────┘
-                                          │  HTTP / WebSockets
-                                          ▼
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                           FASTAPI BACKEND (main.py)                            │
-│  ┌────────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
-│  │   Static Web UI & JS   │  │   /api/query (POST) │  │   /api/qr & /info   │  │
-│  └────────────────────────┘  └──────────┬──────────┘  └─────────────────────┘  │
-└─────────────────────────────────────────┼──────────────────────────────────────┘
-                                          ▼
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                         RAG ENGINE (app/rag_engine.py)                         │
-│  ┌────────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
-│  │   Groq LLM Client      │  │  OpenAI / Ollama    │  │ Local Smart Extract │  │
-│  └────────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
-└─────────────────────────────────────────┼──────────────────────────────────────┘
-                                          ▼
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                     HYBRID RETRIEVER (app/retriever.py)                        │
-│  • BM25 Okapi with domain code boosting (AL-104, BH-220, TX-200)               │
-│  • Active Revision Prioritization (deprioritizes superseded Rev 03)             │
-│  • Out-of-Scope Negative Detector (strict unanswerable refusal)                │
-└─────────────────────────────────────────┼──────────────────────────────────────┘
-                                          ▼
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                  DOCUMENT PARSER & CHUNKER (app/parser.py)                     │
-│  • PyPDF Metadata & Text Extraction                                            │
-│  • Automatic Supersession Relationship Detection                               │
-│  • Section-Aware & Table-Preserving Chunking (app/chunker.py)                  │
-└─────────────────────────────────────────┬──────────────────────────────────────┘
-                                          ▼
-                        ┌───────────────────────────────────┐
-                        │      docs/ (Plant SOP PDFs)       │
-                        │ • MNT-MAN-CNC-02 Rev 02 (CNC PM)  │
-                        │ • QC-SOP-014 Rev 03 (QC - Old)    │
-                        │ • QC-SOP-014 Rev 04 (QC - Active) │
-                        │ • SAF-SOP-003 Rev 05 (LOTO)       │
-                        └───────────────────────────────────┘
-```
-
----
-
-## 🛠 Setup & Quick Start
-
-### 1. Clone the Repository
-```bash
-git clone https://github.com/rishab-bizeai/shopfloor-copilot.git
-cd shopfloor-copilot
-```
-
-### 2. Create and Activate Virtual Environment (Recommended)
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# macOS / Linux
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. (Optional) Configure LLM API Keys
-The app **works out of the box in offline local extractive mode** with zero configuration.  
-To enable full generative LLM responses, copy `.env.example` to `.env` and add your API key:
+### 2. (Optional) Add an API key
+The app works out of the box without any keys using its built-in local extractor. If you'd like to use a cloud LLM, copy `.env.example` to `.env`:
+
 ```bash
-cp .env.example .env
-```
-Inside `.env`:
-```ini
-# Option A: Groq (Recommended - Free & Fast)
-GROQ_API_KEY=gsk_your_key_here
+# Optional: for Groq (very fast, free tier)
+GROQ_API_KEY=gsk_...
 LLM_MODEL=llama-3.3-70b-versatile
 
-# Option B: OpenAI
-OPENAI_API_KEY=sk-your_key_here
-LLM_MODEL=gpt-4o-mini
-
-# Option C: Local Ollama
-OPENAI_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=llama3.2
+# Or for OpenAI / Ollama:
+# OPENAI_API_KEY=sk-...
+# OPENAI_BASE_URL=http://localhost:11434/v1
 ```
 
-### 5. Start the Copilot
+### 3. Start the server
 ```bash
 python main.py
 ```
-Or with Uvicorn:
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
+*(On Windows, you can also just double-click `run.bat`)*
+
+When the server starts, you will see a banner like this in your console:
+```text
+============================================================
+🏭 INITIALIZING BIZTELAI PLANT COPILOT...
+============================================================
+ Loaded 4 SOP documents:
+   • MNT-MAN-CNC-02 Rev 02: Preventive Maintenance Manual - TX-200 CNC Turning Centre [ACTIVE]
+   • QC-SOP-014 Rev 03: Incoming Material Inspection - Standard Operating Procedure (SUPERSEDED by QC-SOP-014 Rev 04)
+   • QC-SOP-014 Rev 04: Incoming Material Inspection - Standard Operating Procedure [ACTIVE]
+   • SAF-SOP-003 Rev 05: Lockout / Tagout (LOTO) - Safety Procedure [ACTIVE]
+ Created 48 section-aware chunks.
+ RAG Engine ready using provider: Local Extractor (bm25-smart-extractive)
+
+🚀 COPILOT IS LIVE & READY FOR SHOP-FLOOR USE!
+💻 Local Access:   http://localhost:8000
+📱 Phone/Tablet:   http://192.168.1.10:8000
+📸 QR Code URL:    http://localhost:8000/api/qr
+============================================================
 ```
 
 ---
 
-## 📱 Local Network & Mobile Deployment
+## Opening on Your Phone (Local Network)
 
-When you launch `python main.py`, the application binds to `0.0.0.0:8000` and automatically detects your laptop's local Wi-Fi IP address.
-
-1. **Terminal Output**:
-   ```
-   ============================================================
-   🏭 INITIALIZING BIZTELAI PLANT COPILOT...
-   ============================================================
-    Loaded 4 SOP documents:
-      • MNT-MAN-CNC-02 Rev 02: Preventive Maintenance Manual - TX-200 CNC Turning Centre [ACTIVE]
-      • QC-SOP-014 Rev 03: Incoming Material Inspection - Standard Operating Procedure (SUPERSEDED by QC-SOP-014 Rev 04)
-      • QC-SOP-014 Rev 04: Incoming Material Inspection - Standard Operating Procedure [ACTIVE]
-      • SAF-SOP-003 Rev 05: Lockout / Tagout (LOTO) - Safety Procedure [ACTIVE]
-    Created 48 section-aware chunks.
-    RAG Engine ready using provider: Local Extractor (bm25-smart-extractive)
-
-   🚀 COPILOT IS LIVE & READY FOR SHOP-FLOOR USE!
-   💻 Local Access:   http://localhost:8000
-   📱 Phone/Tablet:   http://192.168.1.10:8000
-   📸 QR Code URL:    http://localhost:8000/api/qr
-   ============================================================
-   ```
-2. **Open on Phone**:
-   - Ensure your phone is connected to the same Wi-Fi network as your laptop.
-   - Scan the ASCII QR code printed in the terminal or click the **"Phone Access"** button in the web UI header.
-   - Or open your mobile browser and enter: `http://<YOUR_LOCAL_IP>:8000` (e.g. `http://192.168.1.10:8000`).
+1. Make sure your phone is connected to the **same Wi-Fi network** as your laptop.
+2. Open your mobile browser (Safari, Chrome) and type the network URL shown in your terminal (for example `http://192.168.1.10:8000`).
+3. Alternatively, click the **"Phone Access"** button in the web header on your laptop, and scan the QR code with your phone camera.
+4. The interface is responsive and designed for mobile screens with high-contrast text and thumb-friendly buttons.
 
 ---
 
-## 🧪 Testing & Evaluation
+## Testing the App
 
-Run the automated test suite covering all 12 test assertions:
-```bash
-python -m pytest tests/test_rag.py -v
-```
-Output:
-```
-tests/test_rag.py::test_document_ingestion_and_supersession PASSED       [  8%]
-tests/test_rag.py::test_sample_question_1_coolant PASSED                 [ 16%]
-tests/test_rag.py::test_sample_question_2_alarm_al104 PASSED             [ 25%]
-tests/test_rag.py::test_sample_question_3_loto_removal PASSED            [ 33%]
-tests/test_rag.py::test_sample_question_4_bh220_tolerance PASSED         [ 41%]
-tests/test_rag.py::test_sample_question_5_spindle_runout PASSED          [ 50%]
-tests/test_rag.py::test_custom_question_1_missing_mtc PASSED             [ 58%]
-tests/test_rag.py::test_custom_question_2_chuck_bolt_torque PASSED       [ 66%]
-tests/test_rag.py::test_custom_question_3_sampling_plan PASSED           [ 75%]
-tests/test_rag.py::test_custom_question_4_zero_energy PASSED             [ 83%]
-tests/test_rag.py::test_custom_question_5_unanswerable PASSED            [ 91%]
-tests/test_rag.py::test_superseded_warning_when_querying_old_standard PASSED [100%]
-============================= 12 passed in 0.69s ==============================
-```
+### The 5 Sample Questions from the Assignment
 
----
+Here is how the app answers each of the 5 questions provided in the assignment brief:
 
-### 1. Sample Questions & Answers
+#### 1. What is the recommended coolant concentration for the TX-200 CNC turning centre?
+- **Answer**: The recommended coolant concentration is **6 - 8 %**, checked with a refractometer reading multiplied by a 1.0 factor. It is checked daily at the start of shift and weekly by the operator.
+- **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 1, Section: 3. Normal Operating Parameters`
+- **Result**: Verified in document.
 
-#### Q1: What is the recommended coolant concentration for the TX-200 CNC turning centre?
-* **App Answer**:
-  > The recommended coolant concentration for the TX-200 CNC turning centre is **6 - 8 %**.
-  > • **Check Method**: Refractometer reading multiplied by a **1.0 factor**.  
-  > • **Frequency**: Checked daily at the start of shift and weekly by the operator.
-* **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 1, Section: 3. Normal Operating Parameters`
-* **Status**: ✅ Verified in SOP
+#### 2. The machine is showing alarm AL-104. What does it mean and what should the operator do?
+- **Answer**: 
+  - **Meaning**: Way lube oil level low.
+  - **Operator action**: Top up with **ISO VG 68 oil** to the **MAX mark** on the sight glass, then press **RESET**. The machine can continue its cycle after reset.
+- **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 2, Section: Common Alarms`
+- **Result**: Verified in document.
 
-#### Q2: The machine is showing alarm AL-104. What does it mean and what should the operator do?
-* **App Answer**:
-  > **Alarm AL-104 Meaning**: **Way lube oil level low**.  
-  > **Required Operator Action**:  
-  > 1. Top up with **ISO VG 68 oil** to the **MAX mark** on the sight glass.  
-  > 2. Press the **RESET** button on the control panel.  
-  > 3. The machine can continue its normal cycle after reset.
-* **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 2, Section: Common Alarms`
-* **Status**: ✅ Verified in SOP
+#### 3. Who is allowed to remove a lockout lock from a machine?
+- **Answer**: 
+  - **Standard rule (Section 5)**: Each authorised person removes **only their own personal lock**. Nobody is allowed to remove another person's lock.
+  - **When lock owner is absent (Section 6)**: The Shift Supervisor must first make every reasonable effort to contact the owner by phone. If unreachable, **both the Production Manager and the Safety Officer** must authorise removal after physically inspecting the machine. The removal is recorded on form **SF-12 Lock Removal Record**, and the owner is notified before their next shift.
+- **Source Citation**: `SAF-SOP-003 Rev 05, Page 1-2, Sections 5 & 6`
+- **Result**: Verified in document.
 
-#### Q3: Who is allowed to remove a lockout lock from a machine?
-* **App Answer**:
-  > **Standard Policy (Section 5)**: **Each authorised person removes only their own personal lock**. Nobody may remove another person's lock.  
-  > **Procedure When Lock Owner Is Absent (Section 6)**:  
-  > 1. The **Shift Supervisor** must make every reasonable effort to contact the lock owner by phone.  
-  > 2. If unreachable, **both the Production Manager and the Safety Officer** must authorise removal.  
-  > 3. The machine must be physically inspected to confirm it is safe to re-energise.  
-  > 4. Removal must be documented on form **SF-12 Lock Removal Record**, and the owner informed before their next shift.
-* **Source Citation**: `SAF-SOP-003 Rev 05, Page 1-2, Sections 5 & 6`
-* **Status**: ✅ Verified in SOP
+#### 4. What is the outer diameter tolerance for the BH-220 bearing housing?
+- **Answer**: For the BH-220 bearing housing, the outer diameter is **90.000 mm** with a tolerance of **+/- 0.050 mm** (acceptable range: 89.950 to 90.050 mm). It is measured using a calibrated digital caliper and is classified as a **Major** characteristic.
+- **Source Citation**: `QC-SOP-014 Rev 04, Page 2, Section: 6. Inspection Dimensions - BH-220 Bearing Housing`
+- **Result**: Verified in document.
 
-#### Q4: What is the outer diameter tolerance for the BH-220 bearing housing?
-* **App Answer**:
-  > For the **BH-220 bearing housing**, the outer diameter specifications are:  
-  > • **Nominal**: **90.000 mm**  
-  > • **Tolerance**: **+/- 0.050 mm** (acceptable range: 89.950 mm to 90.050 mm)  
-  > • **Measurement Method**: Calibrated **digital caliper**  
-  > • **Defect Classification**: **Major** defect
-* **Source Citation**: `QC-SOP-014 Rev 04, Page 2, Section: 6. Inspection Dimensions - BH-220 Bearing Housing`
-* **Status**: ✅ Verified in SOP
-
-#### Q5: How often should spindle runout be checked, and who does it?
-* **App Answer**:
-  > Spindle runout must be checked **Monthly** by a **Maintenance technician**.  
-  > • **Check Method**: Dial indicator at the chuck face.  
-  > • **Tolerance Limit**: Maximum allowable runout is **0.005 mm max**.
-* **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 1, Section 3 & Section 4`
-* **Status**: ✅ Verified in SOP
+#### 5. How often should spindle runout be checked, and who does it?
+- **Answer**: Spindle runout must be checked **Monthly** by a **Maintenance technician** (tolerance is **0.005 mm max.** at the chuck face using a dial indicator).
+- **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 1, Section 3 & Section 4`
+- **Result**: Verified in document.
 
 ---
 
-### 2. Our 5 Custom Questions & Answers
+### My 5 Custom Questions (Including One the Documents Cannot Answer)
 
-#### Custom Q1 (QC Revision Change / Mandatory Document Check):
-**Question**: *What should the inspector do if the supplier's Material Test Certificate (MTC) is missing during incoming material inspection?*
-* **App Answer**:
-  > Under **QC-SOP-014 Rev 04**, the supplier's **Material Test Certificate (MTC) is mandatory**.  
-  > • **Required Action**: If the MTC is missing, the lot is put on **HOLD** and **must not be inspected or accepted** until the MTC is received.  
-  > *(Note: In superseded Rev 03, MTC was only 'if available', but Rev 04 made it strictly mandatory).*
-* **Source Citation**: `QC-SOP-014 Rev 04, Page 2, Section 5 (Procedure Step 2)`
-* **Status**: ✅ Verified in SOP
+To thoroughly test the copilot across quality, maintenance, safety, and edge-cases, I wrote these 5 additional questions:
+
+#### Custom Q1 (QC Revision Change / Mandatory Document Rule):
+> *"What should the inspector do if the supplier's Material Test Certificate (MTC) is missing during incoming inspection?"*
+- **App Answer**: Under **QC-SOP-014 Rev 04**, the supplier's Material Test Certificate (MTC) is **mandatory**. If it is missing, the lot is placed on **HOLD** and must not be inspected or accepted until the MTC is received. *(Note: in older superseded Rev 03, MTC was only 'if available', but Rev 04 made it mandatory).*
+- **Source Citation**: `QC-SOP-014 Rev 04, Page 2, Section 5`
+- **Result**: Verified in document.
 
 #### Custom Q2 (Maintenance Torque Specification):
-**Question**: *What is the required torque and sequence for tightening the chuck mounting bolts after maintenance on the TX-200 CNC?*
-* **App Answer**:
-  > When re-mounting the chuck after maintenance on the TX-200 CNC:  
-  > • Tighten mounting bolts in a **criss-cross sequence**.  
-  > • Tighten to **110 Nm** using a calibrated torque wrench.
-* **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 1, Section 5`
-* **Status**: ✅ Verified in SOP
+> *"What is the required torque and sequence for tightening the chuck mounting bolts after maintenance on the TX-200 CNC?"*
+- **App Answer**: Tighten the chuck mounting bolts in a **criss-cross sequence to 110 Nm** using a calibrated torque wrench.
+- **Source Citation**: `MNT-MAN-CNC-02 Rev 02, Page 1, Section 5`
+- **Result**: Verified in document.
 
 #### Custom Q3 (Lot-Size Sampling Plan Calculation):
-**Question**: *For a received lot of 250 pieces of steel bar stock, how many samples must be inspected, and what defect rule applies?*
-* **App Answer**:
-  > Under **QC-SOP-014 Rev 04 (Section 4 Sampling Plan)**:  
-  > • For a lot size between **91 - 500 pieces** (such as 250 pieces), inspect **13 samples** at random.  
-  > • **Minor Defects**: Accept if 0, reject if 1 or more.  
-  > • **Major Defects**: Complete lot is rejected (SQE may authorise 100% sorting at supplier's cost).  
-  > • **Critical Defects**: Complete lot rejected and returned to supplier. Sorting is not allowed.
-* **Source Citation**: `QC-SOP-014 Rev 04, Page 1, Section 4`
-* **Status**: ✅ Verified in SOP
+> *"For a received lot of 250 pieces of steel bar stock, how many samples must be inspected, and what defect rule applies?"*
+- **App Answer**: For a lot size between 91 and 500 pieces (which includes 250 pieces), inspect **13 samples** at random.  
+  - Minor defects allowed: 0 (reject if 1 or more).  
+  - Major defects: Complete lot is rejected (SQE may decide 100% sorting at supplier cost).  
+  - Critical defects: Complete lot rejected and returned to supplier. No sorting allowed.
+- **Source Citation**: `QC-SOP-014 Rev 04, Page 1, Section 4`
+- **Result**: Verified in document.
 
 #### Custom Q4 (Safety Zero-Energy Verification Protocol):
-**Question**: *How must an authorised person verify zero energy state before working on a machine under LOTO?*
-* **App Answer**:
-  > To verify zero energy under **SAF-SOP-003 Rev 05 (Section 4)**:  
-  > 1. **Release Stored Energy**: Bleed hydraulic pressure and accumulators until gauge reads zero, vent compressed air to 0 bar, and block parts that can fall under gravity.  
-  > 2. **Functional Verification**: Try to start the machine from the control panel and confirm it **does not start**.  
-  > 3. **Gauge Confirmation**: Confirm all pressure gauges read zero.  
-  > 4. **Controls**: Return controls to **OFF**.
-* **Source Citation**: `SAF-SOP-003 Rev 05, Page 1, Section 4`
-* **Status**: ✅ Verified in SOP
+> *"How must an authorised person verify zero energy state before working on a machine under LOTO?"*
+- **App Answer**: First release stored energy: bleed hydraulic pressure and accumulators until the gauge reads zero, vent compressed air to 0 bar, and block gravity-fall parts. Then verify zero energy by attempting to start the machine from the control panel to confirm it does not start, confirm all pressure gauges read zero, and return controls to OFF.
+- **Source Citation**: `SAF-SOP-003 Rev 05, Page 1, Section 4`
+- **Result**: Verified in document.
 
-#### Custom Q5 (UNANSWERABLE / Out-of-Scope Question):
-**Question**: *What is the maximum feed rate and spindle speed for cutting titanium alloy on CNC-04?*
-* **App Answer**:
+#### Custom Q5 (UNANSWERABLE — Tests Zero Hallucination):
+> *"What is the maximum feed rate and spindle speed for cutting titanium alloy on CNC-04?"*
+- **App Answer**:
   > **This information is not found in the available plant SOPs and manuals.**  
   > None of the indexed documents (`MNT-MAN-CNC-02`, `QC-SOP-014`, `SAF-SOP-003`) contain details answering this query. Please verify with your Shift Supervisor, Maintenance Engineer, or Quality Lead.
-* **Source Citation**: None (Zero hallucinations policy active)
-* **Status**: ❌ Out of Document Scope (Handled with Strict Negative Assertion)
+- **Source Citation**: None. The app returns `is_found: false` and displays a blue out-of-scope notice.
+- **Result**: Successfully refused without hallucinating.
 
 ---
 
-### 3. Real Shop-Floor Human Queries vs. Formal Queries
+### Real-World Shop-Floor Scenarios (Messy Human Phrasing)
 
-On an actual shop floor, supervisors and operators don't speak in formal academic prose. The copilot is specifically tested and optimized to handle messy, conversational human phrasing:
+Real supervisors rarely speak like an audit checklist. They speak quickly in conversational shorthand. The copilot includes quick-action chips for real shift questions:
 
-| Real Human Shop-Floor Query | Intent / Standard Topic | App Answer & Citation |
-|---|---|---|
-| *"AL-104 popped up on CNC-06. What oil do I top up and how to reset?"* | Machine Alarm Troubleshooting | Top up **ISO VG 68 oil** to MAX mark, press RESET (`MNT-MAN-CNC-02 Rev 02, Page 2`) |
-| *"Refractometer check: what coolant percentage should we maintain on the TX-200?"* | Daily Operating Parameter | Recommended **6 - 8 %**, refractometer × 1.0 factor (`MNT-MAN-CNC-02 Rev 02, Page 1`) |
-| *"Technician left his red LOTO lock on CNC-04 and went home. Can I take it off myself?"* | Safety Lockout Policy | **No.** Only owner can remove. Absent owner requires PM + Safety Officer authorization (`SAF-SOP-003 Rev 05, Page 1-2`) |
-| *"Supplier delivered a batch of steel bars but forgot the MTC certificate. Can we proceed?"* | Incoming Inspection Rule | **No.** Put on **HOLD**. MTC is mandatory under Rev 04 (`QC-SOP-014 Rev 04, Page 2`) |
-| *"Inspector is measuring BH-220 bearing housings with a digital caliper. What are the OD limits?"* | Dimensional Quality Check | Nominal **90.000 mm**, Tolerance **+/- 0.050 mm** (`QC-SOP-014 Rev 04, Page 2`) |
-| *"Receiving just got 250 bought-out pins. How many pieces to sample, and defect rule?"* | Lot Sampling Plan | Inspect **13 samples**. Minor: 0 allowed. Major/Critical: Reject (`QC-SOP-014 Rev 04, Page 1`) |
-| *"Technician just re-mounted the chuck on TX-200. What torque and pattern should he use?"* | Assembly & Maintenance | Tighten in **criss-cross sequence to 110 Nm** (`MNT-MAN-CNC-02 Rev 02, Page 1`) |
-| *"Operator wants to know: what feed rate and spindle speed for cutting titanium on CNC-04?"* | **Unanswerable / Out of Scope** | **Strict Refusal**: *"This information is not found in the plant SOPs"* (Zero hallucinations) |
+- *"AL-104 on CNC-06, what oil and how to reset?"*
+- *"Refractometer check: what coolant % on TX-200?"*
+- *"Technician went home with lock on. Can I cut it?"*
+- *"Batch arrived without MTC cert. Can we inspect?"*
+- *"BH-220 bearing housing: OD caliper tolerance?"*
+- *"Got 250 pins: how many to sample, defect rule?"*
+- *"Re-mounted chuck: what torque and sequence?"*
+- *"Who inspects spindle runout and how often?"*
+- *"Can we cut titanium at 2500 RPM on CNC-04?"* (Unanswerable)
+
+All of these can be tested with 1 click in the web UI.
 
 ---
 
-## 📂 Component File Structure
+## How It's Built (Architecture & Code Structure)
 
 ```
 BizeAi/
 ├── app/
-│   ├── __init__.py
-│   ├── config.py             # Server settings, LAN IP auto-detection, LLM model configs
-│   ├── models.py             # Pydantic schemas (QueryRequest, QueryResponse, Citations)
-│   ├── parser.py             # PDF reader with automated QMS supersession detection
-│   ├── chunker.py            # Section-aware chunking preserving tables & alarm entries
-│   ├── retriever.py          # BM25 + keyword hybrid search with revision weighting
-│   ├── rag_engine.py         # Multi-provider LLM chain + grounded prompt engineering
+│   ├── config.py             # LAN IP detection, port binding, environment config
+│   ├── models.py             # Clean Pydantic schemas (QueryRequest, QueryResponse, Citations)
+│   ├── parser.py             # PyPDF text extraction & automated QMS supersession detection
+│   ├── chunker.py            # Section-aware chunking (keeps table rows & alarms together)
+│   ├── retriever.py          # BM25 + keyword hybrid search with active revision weighting
+│   ├── rag_engine.py         # Multi-provider LLM chain + smart local extractive fallback
 │   └── web/
 │       ├── static/
-│       │   ├── css/
-│       │   │   └── style.css # High-contrast mobile shop-floor theme
-│       │   └── js/
-│       │       └── app.js    # Client logic: speech-to-text, quick chips, clipboard copy
+│       │   ├── css/style.css # High-contrast mobile shop-floor theme
+│       │   ├── js/app.js     # Speech-to-text, quick chips, clipboard copy
+│       │   └── favicon.svg   # Custom industrial gear icon (no 404s)
 │       └── templates/
-│           └── index.html    # Clean, thumb-friendly responsive frontend
-├── docs/                     # Plant SOP PDFs from Google Drive
-│   ├── MNT-MAN-CNC-02_TX-200_Preventive_Maintenance.pdf
-│   ├── QC-SOP-014_Rev03_Incoming_Material_Inspection.pdf
-│   ├── QC-SOP-014_Rev04_Incoming_Material_Inspection.pdf
-│   ├── SAF-SOP-003_Lockout_Tagout_Procedure.pdf
-│   └── Sample_Questions.pdf
+│           └── index.html    # Clean, thumb-friendly mobile responsive UI
+├── docs/                     # Downloaded official plant SOP PDFs
 ├── tests/
-│   ├── __init__.py
-│   └── test_rag.py           # Automated test suite (12 assertions)
-├── .env.example              # Template for API keys & model configuration
+│   └── test_rag.py           # Automated test suite (13 tests passing in pytest)
 ├── main.py                   # FastAPI server entry point + ASCII QR generation
 ├── requirements.txt          # Python dependencies
 ├── THINKING.md               # User analysis, user journey, AI challenge, reflection
-└── README.md                 # Complete guide, sample test answers, and documentation
+└── README.md                 # Complete documentation & test answers
+```
+
+### Why BM25 + Exact Code Match instead of a Heavy Vector DB?
+For a plant SOP library of this size (tens to hundreds of pages), running a massive dense vector embedding model or spinning up Chroma/FAISS adds unnecessary cold-start latency, requires heavy GPU/torch dependencies (over 2 GB), and often drifts on exact machine codes (like confusing `AL-104` with `AL-101`). 
+
+By combining **BM25 Okapi** with **exact code/symbol boosting** (for identifiers like `AL-104`, `BH-220`, `SAF-SOP-003`, `110 Nm`), retrieval is instantaneous (< 2ms), 100% deterministic, and runs on any low-power laptop or plant mini-PC with zero friction.
+
+---
+
+## Running the Automated Tests
+
+The repo includes a full test suite covering document parsing, supersession detection, all 5 sample questions, custom questions, natural human phrasing, and out-of-scope negative assertion:
+
+```bash
+python -m pytest tests/test_rag.py -v
+```
+
+All **13 tests pass** in under 1 second:
+```text
+tests/test_rag.py::test_document_ingestion_and_supersession PASSED       [  7%]
+tests/test_rag.py::test_sample_question_1_coolant PASSED                 [ 15%]
+tests/test_rag.py::test_sample_question_2_alarm_al104 PASSED             [ 23%]
+tests/test_rag.py::test_sample_question_3_loto_removal PASSED            [ 30%]
+tests/test_rag.py::test_sample_question_4_bh220_tolerance PASSED         [ 38%]
+tests/test_rag.py::test_sample_question_5_spindle_runout PASSED          [ 46%]
+tests/test_rag.py::test_custom_question_1_missing_mtc PASSED             [ 53%]
+tests/test_rag.py::test_custom_question_2_chuck_bolt_torque PASSED       [ 61%]
+tests/test_rag.py::test_custom_question_3_sampling_plan PASSED           [ 69%]
+tests/test_rag.py::test_custom_question_4_zero_energy PASSED             [ 76%]
+tests/test_rag.py::test_custom_question_5_unanswerable PASSED            [ 84%]
+tests/test_rag.py::test_superseded_warning_when_querying_old_standard PASSED [ 92%]
+tests/test_rag.py::test_human_natural_queries PASSED                     [100%]
+
+============================= 13 passed in 0.84s ==============================
 ```
 
 ---
 
-## 📦 Submission Deliverables
+## Submission Notes
 
-Per the BiztelAI assignment instructions:
-1. **GitHub Repository**: Public repository containing all modular source code, tests, documentation, and sample questions.
-2. **THINKING.md**: Contains the 5 required sections:
-   - *Understand the user*
-   - *User journey*
-   - *AI challenge (conversation excerpts and reflection)*
-   - *The improvement added, and why chosen*
-   - *Final reflection (challenges faced, customer questions, next steps)*
-3. **Screen Recording**: 2–3 minute video demonstration showcasing:
-   - The copilot answering 2 sample questions with citations.
-   - The copilot responding to an unanswerable question with strict negative assertion.
-   - The application opened and used from a mobile phone on the same Wi-Fi network.
+- **THINKING.md**: Contains the full narrative covering:
+  1. *Understand the user* (shop-floor supervisor profile, frustrations, assumptions)
+  2. *User journey* (first draft before AI critique, failure modes)
+  3. *AI challenge* (critique excerpts from a skeptical plant director & my reflection)
+  4. *The improvement added* (Revision-aware intelligence & supersession guardrails)
+  5. *Final reflection* (next steps, customer questions, challenges faced and handled)
+- **Screen Recording (2–3 mins)**: Demonstrates:
+  1. Answering 2 sample questions with verifiable citations.
+  2. Handling the unanswerable question with a strict negative assertion.
+  3. Live demonstration of the app opened and used from a mobile phone on the same Wi-Fi.
